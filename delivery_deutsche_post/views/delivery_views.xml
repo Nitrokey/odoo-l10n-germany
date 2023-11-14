@@ -11,8 +11,8 @@
             <group>
               <group>
                 <field name="carrier_account_id" />
-                <field name="delivery_type" />
                 <field name="product_code" />
+                <field name="depost_price" attrs="{'invisible': [('delivery_type', '!=', 'deutsche_post')]}" />
               </group>
             </group>
           </page>

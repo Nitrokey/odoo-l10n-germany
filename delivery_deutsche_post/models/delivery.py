@@ -27,6 +27,8 @@ class DeliveryCarrier(models.Model):
         help="Carrier type (combines several delivery methods)",
     )
 
+    depost_price = fields.Float(string="Deutsche Post Price")
+
     @api.onchange("carrier_account_id")
     def onchange_carrier_account_id(self):
         if self.carrier_account_id:
@@ -249,9 +251,12 @@ class DeliveryCarrier(models.Model):
         return result
 
     def deutsche_post_rate_shipment(self, order):
-        raise ValidationError(
-            _("Deutsche Post: Rating shipping is not supported.")
-        )
+        return {
+            "success": True,
+            "price": self.depost_shipment_price,
+            "error_message": False,
+            "warning_message": False,
+        }
 
     def deutsche_post_get_tracking_link(self, picking):
         raise ValidationError(
