@@ -253,7 +253,7 @@ class DeliveryCarrier(models.Model):
     def deutsche_post_rate_shipment(self, order):
         return {
             "success": True,
-            "price": self.depost_shipment_price,
+            "price": self.depost_price,
             "error_message": False,
             "warning_message": False,
         }
