@@ -1,9 +1,10 @@
-from odoo import _, api, fields, models
-from odoo.exceptions import UserError, ValidationError
+import logging
 
 import inema
-import logging
 import requests
+
+from odoo import _, api, fields, models
+from odoo.exceptions import UserError, ValidationError
 
 KEY_PHASE = "1"
 prod_code_with_tracking = ["1022"]
@@ -187,30 +188,27 @@ class DeliveryCarrier(models.Model):
         result = []
 
         for rec in pickings:
-            last_name = (
-                rec.partner_id.parent_id.name + ", " + rec.partner_id.name
-                if rec.partner_id.parent_id
-                and rec.partner_id.name != rec.partner_id.parent_id.name
-                else rec.partner_id.name
-            )
-            last_name = (
-                rec.partner_id.parent_id.name + ", " + rec.partner_id.name
-                if rec.partner_id.parent_id
-                and rec.partner_id.name != rec.partner_id.parent_id.name
-                else rec.partner_id.name
-            )
+            company_name = ""
+            company = rec.partner_id.parent_id.name or rec.partner_id.company_name
+            if (
+                company
+                and rec.partner_id.type != "private"
+                and company != rec.partner_id.name
+            ):
+                company_name = company
+
             data = {
                 "name": rec.name,
                 "prod_code": product_code,
                 "dest": {
                     "first": "",
-                    "last": last_name,
+                    "last": rec.partner_id.name,
                     "street": rec.partner_id.street or "",
                     "street2": rec.partner_id.street2 or "",
                     "zip": rec.partner_id.zip or "",
                     "city": rec.partner_id.city or "",
                     "country": rec.partner_id.country_id.code_iso or "",
-                    "company": "",
+                    "company": company_name,
                     "title": rec.partner_id.title.shortcut
                     if rec.partner_id.title
                     else "",
