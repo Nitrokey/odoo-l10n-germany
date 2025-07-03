@@ -492,8 +492,15 @@ class DatevExport(models.Model):
         }
 
     def unlink(self):
-        attachments = self.mapped("attachment_id")
+        # Safely collect attachments before deletion
+        attachments = self.env["ir.attachment"]
+        for record in self:
+            if hasattr(record, "attachment_id") and record.attachment_id:
+                attachments |= record.attachment_id
+
         res = super().unlink()
+
+        # Clean up attachments after successful deletion
         attachments.exists().unlink()
         return res
 
