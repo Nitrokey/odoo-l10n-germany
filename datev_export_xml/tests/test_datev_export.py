@@ -928,3 +928,156 @@ class TestDatevExport(TransactionCase):
             self.consulting.default_code,
             "The exported line should be the consulting product (no discount)",
         )
+
+    def test_partner_special_characters_validation(self):
+        """Test that partners with special characters are properly validated and rejected."""
+        # Create a partner with invalid control characters
+        invalid_partner = self.PartnerObj.create(
+            {
+                "name": "Test Customer\x01",  # Contains U+0001 (control character)
+                "street": "Main Street\x02",  # Contains U+0002 (control character)
+                "city": "Test City",
+                "zip": "12345",
+                "is_company": True,
+            }
+        )
+
+        # Create an invoice with this partner
+        tax = self.env["account.tax"].create(
+            {
+                "name": "Tax 19%",
+                "amount": 19.0,
+                "amount_type": "percent",
+                "type_tax_use": "sale",
+            }
+        )
+
+        invoice = self.InvoiceObj.create(
+            {
+                "partner_id": invalid_partner.id,
+                "user_id": self.env.user.id,
+                "invoice_date": self.start_date,
+                "invoice_date_due": self.end_date,
+                "company_id": self.env.company.id,
+                "currency_id": self.env.company.currency_id.id,
+                "move_type": "out_invoice",
+                "invoice_line_ids": [
+                    (
+                        0,
+                        0,
+                        {
+                            "product_id": self.consulting.id,
+                            "quantity": 1.0,
+                            "price_unit": 100.00,
+                            "tax_ids": [(6, 0, tax.ids)],
+                            "account_id": self.account_income.id,
+                            "analytic_account_id": self.analytic_account_it.id,
+                        },
+                    ),
+                ],
+            }
+        )
+        invoice.action_post()
+
+        # Create export and validate
+        datev_export = self.create_customer_datev_export_manually(invoice)
+
+        # Validation should detect the invalid characters
+        datev_export.action_validate()
+
+        # Check that the invoice is marked as problematic
+        self.assertTrue(
+            invoice.datev_validation,
+            "Invoice should have validation error due to special characters",
+        )
+        self.assertIn(
+            "U+0001",
+            invoice.datev_validation,
+            "Validation error should mention the specific invalid character U+0001",
+        )
+        self.assertIn(
+            "U+0002",
+            invoice.datev_validation,
+            "Validation error should mention the specific invalid character U+0002",
+        )
+        self.assertIn(
+            "invalid characters",
+            invoice.datev_validation.lower(),
+            "Validation error should mention invalid characters",
+        )
+
+        # Check that problematic invoices count is updated
+        self.assertEqual(
+            datev_export.problematic_invoices_count,
+            1,
+            "Should have 1 problematic invoice",
+        )
+
+    def test_partner_valid_characters_pass_validation(self):
+        """Test that partners with only valid characters pass validation."""
+        # Create a partner with only valid characters
+        valid_partner = self.PartnerObj.create(
+            {
+                "name": "Test Customer Valid",
+                "street": "Main Street 123",
+                "city": "Test City",
+                "zip": "12345",
+                "is_company": True,
+            }
+        )
+
+        # Create an invoice with this partner
+        tax = self.env["account.tax"].create(
+            {
+                "name": "Tax 19%",
+                "amount": 19.0,
+                "amount_type": "percent",
+                "type_tax_use": "sale",
+            }
+        )
+
+        invoice = self.InvoiceObj.create(
+            {
+                "partner_id": valid_partner.id,
+                "user_id": self.env.user.id,
+                "invoice_date": self.start_date,
+                "invoice_date_due": self.end_date,
+                "company_id": self.env.company.id,
+                "currency_id": self.env.company.currency_id.id,
+                "move_type": "out_invoice",
+                "invoice_line_ids": [
+                    (
+                        0,
+                        0,
+                        {
+                            "product_id": self.consulting.id,
+                            "quantity": 1.0,
+                            "price_unit": 100.00,
+                            "tax_ids": [(6, 0, tax.ids)],
+                            "account_id": self.account_income.id,
+                            "analytic_account_id": self.analytic_account_it.id,
+                        },
+                    ),
+                ],
+            }
+        )
+        invoice.action_post()
+
+        # Create export and validate
+        datev_export = self.create_customer_datev_export_manually(invoice)
+
+        # Validation should pass without errors
+        datev_export.action_validate()
+
+        # Check that the invoice has no validation errors
+        self.assertFalse(
+            invoice.datev_validation,
+            "Invoice should not have validation errors with valid characters",
+        )
+
+        # Check that problematic invoices count is 0
+        self.assertEqual(
+            datev_export.problematic_invoices_count,
+            0,
+            "Should have 0 problematic invoices",
+        )
